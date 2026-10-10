@@ -308,7 +308,7 @@ body.reveal .stage {
     width: 100vw;
     height: clamp(52px, 7vh, 68px);
     transform: translate(-50%, -50%);
-    background: #e6f01a;
+    background: transparent;
     display: flex;
     align-items: center;
     justify-content: space-between;
