@@ -7,458 +7,302 @@ window.__onPortfolio = function (fn) {
 };
 
 /* ============================================================
-   AVATAR (pixel → photo iris)
+   AVATAR (photo → Joyboy iris reveal on hover)
    ============================================================ */
 (() => {
     const AVATAR_PHOTO = 'photo.png';
-    const HOVER_PHOTO = 'photo.png';
+    const HOVER_PHOTO = 'Joyboy.jpg';
 
     const wrap = document.getElementById('avatar');
+    if (!wrap) return;
     const canvas = document.getElementById('art');
+    if (!canvas) return;
     const ctx = canvas.getContext('2d');
     const note = document.getElementById('note');
 
+    // Configuration
     const CFG = {
-        src: AVATAR_PHOTO,
-        hoverSrc: HOVER_PHOTO,
-        zoom: 1.0,
-        artCircle: 0.945,
-        offsetX: 0,
-        offsetY: 0,
-        cellsAcross: 52,
-        minCell: 2,
-        fullAt: 0.62,
-        maxSize: 0.94,
-        minSize: 0.26,
-        lift: 26,
-        corner: 0.24,
-        morphIn: 8,
-        morphOut: 5.5,
-        feather: 0.38,
-        origin: 5,
-        follow: 16,
-        hold: 650,
-        intro: true,
-        introDelay: 400,
-        introDur: 700,
+        followSpeed: 18,    // Fluid cursor tracking speed
+        morphIn: 9,         // Speed of iris opening on hover
+        morphOut: 6.5,      // Speed of iris closing on leave
+        feather: 0.38,      // Radial gradient edge softness ratio
+        holdTouch: 1600,    // Touch hold duration in ms
     };
 
     const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (REDUCED) CFG.morphIn = CFG.morphOut = 60;
+    if (REDUCED) {
+        CFG.morphIn = 40;
+        CFG.morphOut = 40;
+    }
 
-    const mid = document.createElement('canvas');
-    const mctx = mid.getContext('2d', { willReadFrequently: true });
-    const midHover = document.createElement('canvas');
-    const mhctx = midHover.getContext('2d', { willReadFrequently: true });
+    // Images
+    const baseImg = new Image();
+    const hoverImg = new Image();
+    let baseReady = false;
+    let hoverReady = false;
 
-    const grid = document.createElement('canvas');
-    const gctx = grid.getContext('2d', { willReadFrequently: true });
+    // Offscreen layer for masked composition
     const layer = document.createElement('canvas');
     const lctx = layer.getContext('2d');
 
     const TAU = Math.PI * 2;
+    let D = 0, DPR = 1;
+    let isHovered = false;
+    let tx = 0, ty = 0;       // Target pointer position (CSS px)
+    let ox = 0, oy = 0;       // Current iris center (CSS px)
+    let h = 0;                // Reveal progress (0.0 to 1.0)
+    let rafId = null;
+    let lastTime = 0;
+    let touchHoldTimer = null;
 
-    let D = 0, DPR = 1, cols = 0, cell = 0;
-    let colourStr = null, shrink = null;
-    let ax = null, ay = null, adc = null, aIdx = null, A = 0;
-    let imgReady = false, hoverReady = false, needs = true, wasLive = true;
-    let introOn = false, introT0 = 0, introEnd = 0;
-
-    function makeFallbackCanvas(seed, palette) {
-        const c = document.createElement('canvas');
-        c.width = c.height = 640;
-        const x = c.getContext('2d');
-        x.fillStyle = '#0b0b12';
-        x.fillRect(0, 0, 640, 640);
-
-        let s = seed >>> 0;
-        const rnd = () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
-
-        const cells = 26;
-        const cw = 640 / cells;
-        const cx = 320, cy = 320, R = 320;
-
-        for (let j = 0; j < cells; j++) {
-            for (let i = 0; i < cells; i++) {
-                const px = (i + 0.5) * cw;
-                const py = (j + 0.5) * cw;
-                const dx = px - cx, dy = py - cy;
-                const d = Math.sqrt(dx * dx + dy * dy);
-                if (d > R * 1.02) continue;
-
-                const edgeFade = 1 - Math.min(1, d / R);
-                const v = rnd();
-                if (v > 0.35 + edgeFade * 0.55) continue;
-
-                x.fillStyle = palette[Math.floor(rnd() * palette.length)];
-                x.globalAlpha = 0.55 + edgeFade * 0.45;
-                const pad = 0.6 + rnd() * 1.4;
-                x.fillRect(px - cw / 2 + pad, py - cw / 2 + pad, cw - pad * 2, cw - pad * 2);
-            }
-        }
-        x.globalAlpha = 1;
-
-        const g = x.createRadialGradient(cx, cy, R * 0.55, cx, cy, R);
-        g.addColorStop(0, 'rgba(0,0,0,0)');
-        g.addColorStop(1, 'rgba(0,0,0,.55)');
-        x.fillStyle = g;
-        x.beginPath();
-        x.arc(cx, cy, R, 0, TAU);
-        x.fill();
-        return c;
+    function setNote(text) {
+        if (!note) return;
+        note.textContent = text || '';
+        note.hidden = !text;
     }
 
-    const FB_DEFAULT = ['#1b1b2b', '#2a2a44', '#3a3a66', '#57578f', '#7a7ac0',
-        '#c0c0e8', '#f2f2ff', '#ffd166', '#e6f01a'];
-    const FB_HOVER = ['#1a0f2a', '#2e1a4a', '#4a2a7a', '#7a4aa8', '#c07ac0',
-        '#f2b3e8', '#ffd166', '#e6f01a', '#f6f8fc'];
+    function drawCover(targetCtx, img, targetD) {
+        const iw = img.naturalWidth || img.width;
+        const ih = img.naturalHeight || img.height;
+        if (!iw || !ih) return;
+        const side = Math.min(iw, ih);
+        const sx = (iw - side) * 0.5;
+        const sy = (ih - side) * 0.5;
+        targetCtx.drawImage(img, sx, sy, side, side, 0, 0, targetD, targetD);
+    }
 
     function resize() {
         DPR = Math.min(window.devicePixelRatio || 1, 2);
         D = wrap.clientWidth;
         if (!D) return;
-        canvas.width = canvas.height = layer.width = layer.height = Math.round(D * DPR);
+
+        const pixelSize = Math.round(D * DPR);
+        if (canvas.width !== pixelSize || canvas.height !== pixelSize) {
+            canvas.width = canvas.height = pixelSize;
+            layer.width = layer.height = pixelSize;
+        }
+
+        if (ox === 0 && oy === 0) {
+            ox = tx = D * 0.5;
+            oy = ty = D * 0.5;
+        }
+
+        render();
+    }
+
+    function render() {
+        if (!D || !baseReady) return;
+
+        ctx.save();
         ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-        sample();
-    }
-
-    function sample() {
-        cols = Math.max(8, Math.min(CFG.cellsAcross, Math.floor(D / CFG.minCell)));
-        cell = D / cols;
-
-        const n = cols * cols;
-        grid.width = grid.height = cols;
-        gctx.fillStyle = '#000';
-        gctx.fillRect(0, 0, cols, cols);
-
-        if (imgReady) {
-            const dd = cols * CFG.zoom / CFG.artCircle;
-            const cx = cols * 0.5 + CFG.offsetX * cols;
-            const cy = cols * 0.5 + CFG.offsetY * cols;
-            gctx.save();
-            gctx.beginPath();
-            gctx.arc(cols * 0.5, cols * 0.5, cols * 0.5 * 0.985, 0, TAU);
-            gctx.clip();
-            gctx.imageSmoothingEnabled = true;
-            gctx.imageSmoothingQuality = 'high';
-            gctx.drawImage(mid, 0, 0, mid.width, mid.height,
-                cx - dd * 0.5, cy - dd * 0.5, dd, dd);
-            gctx.restore();
-        }
-
-        let d = null;
-        try { d = gctx.getImageData(0, 0, cols, cols).data; }
-        catch (e) { d = null; }
-
-        colourStr = new Array(n);
-        shrink = new Float32Array(n);
-
-        const L = CFG.lift;
-        const INV_FULL = 1 / CFG.fullAt;
-
-        for (let i = 0; i < n; i++) {
-            if (d) {
-                const o = i * 4;
-                let r = d[o], g = d[o + 1], b = d[o + 2];
-                if (r < L) r = L;
-                if (g < L) g = L;
-                if (b < L) b = L;
-                colourStr[i] = 'rgb(' + r + ',' + g + ',' + b + ')';
-                const lum = (0.2126 * d[o] + 0.7152 * d[o + 1] + 0.0722 * d[o + 2]) / 255;
-                let u = 1 - lum * INV_FULL;
-                if (u < 0) u = 0;
-                shrink[i] = u * u * (3 - 2 * u);
-            } else {
-                colourStr[i] = 'rgb(40,40,40)';
-                shrink[i] = 0.5;
-            }
-        }
-
-        const mid0 = cols * 0.5, reachC = mid0 + 1;
-        const xs = [], ys = [], ds = [], ids = [];
-        for (let j = 0; j < cols; j++) {
-            const ddy = j + 0.5 - mid0;
-            const ddy2 = ddy * ddy;
-            for (let i = 0; i < cols; i++) {
-                const ddx = i + 0.5 - mid0;
-                const dc = Math.sqrt(ddx * ddx + ddy2);
-                if (dc > reachC) continue;
-                xs.push((i + 0.5) * cell);
-                ys.push((j + 0.5) * cell);
-                ds.push(dc);
-                ids.push(j * cols + i);
-            }
-        }
-        A = xs.length;
-        ax = Float32Array.from(xs);
-        ay = Float32Array.from(ys);
-        adc = Float32Array.from(ds);
-        aIdx = Int32Array.from(ids);
-
-        needs = true; wasLive = true;
-    }
-
-    function setNote(text) { note.textContent = text || ''; note.hidden = !text; }
-
-    function prepareFromImage(image, targetCanvas, targetCtx) {
-        const iw = image.naturalWidth, ih = image.naturalHeight;
-        const side = Math.min(iw, ih);
-        targetCanvas.width = targetCanvas.height = 640;
-        targetCtx.clearRect(0, 0, 640, 640);
-        targetCtx.imageSmoothingEnabled = true;
-        targetCtx.imageSmoothingQuality = 'high';
-        targetCtx.drawImage(image, (iw - side) * 0.5, (ih - side) * 0.5, side, side, 0, 0, 640, 640);
-        return true;
-    }
-
-    function prepareFromCanvas(srcCanvas, targetCanvas, targetCtx) {
-        targetCanvas.width = targetCanvas.height = 640;
-        targetCtx.clearRect(0, 0, 640, 640);
-        targetCtx.imageSmoothingEnabled = true;
-        targetCtx.imageSmoothingQuality = 'high';
-        targetCtx.drawImage(srcCanvas, 0, 0, 640, 640);
-        return true;
-    }
-
-    function loadDefault(url, onDone) {
-        const im = new Image();
-        im.onload = () => {
-            prepareFromImage(im, mid, mctx);
-            imgReady = true;
-            wrap.classList.add('loaded');
-            setNote('');
-            sample();
-            onDone(true);
-        };
-        im.onerror = () => {
-            prepareFromCanvas(makeFallbackCanvas(1337, FB_DEFAULT), mid, mctx);
-            imgReady = true;
-            wrap.classList.add('loaded');
-            setNote('');
-            sample();
-            onDone(true);
-        };
-        im.src = url;
-    }
-
-    function loadHover(url, onDone) {
-        const fallbackHover = () => {
-            prepareFromCanvas(makeFallbackCanvas(9001, FB_HOVER), midHover, mhctx);
-            hoverReady = true;
-            onDone();
-        };
-        if (!url) { fallbackHover(); return; }
-
-        const im = new Image();
-        im.onload = () => {
-            hoverReady = prepareFromImage(im, midHover, mhctx);
-            onDone();
-        };
-        im.onerror = fallbackHover;
-        im.src = url;
-    }
-
-    function startIntro() {
-        if (CFG.intro && !REDUCED) {
-            introOn = true;
-            introT0 = performance.now();
-            introEnd = introT0 + CFG.introDelay + CFG.introDur + 60;
-            needs = true;
-            wasLive = true;
-        }
-    }
-
-    loadDefault(CFG.src, ok => {
-        if (!ok) return;
-        loadHover(CFG.hoverSrc, () => {
-            window.__onPortfolio(startIntro);
-        });
-    });
-
-    const iris = { h: 0, ox: 0, oy: 0 };
-    let pointerOn = false, holdUntil = 0;
-    let tx = 0, ty = 0, sx = 0, sy = 0;
-
-    function setPointer(e) {
-        const r = canvas.getBoundingClientRect();
-        const k = r.width ? D / r.width : 1;
-        tx = (e.clientX - r.left) * k;
-        ty = (e.clientY - r.top) * k;
-        if (!pointerOn) { sx = tx; sy = ty; pointerOn = true; }
-    }
-    wrap.addEventListener('pointermove', setPointer, { passive: true });
-    wrap.addEventListener('pointerdown', setPointer, { passive: true });
-    wrap.addEventListener('pointerup', e => {
-        if (e.pointerType === 'touch') { pointerOn = false; holdUntil = performance.now() + CFG.hold; }
-    });
-    wrap.addEventListener('pointerleave', () => { pointerOn = false; });
-    wrap.addEventListener('pointercancel', () => { pointerOn = false; });
-    window.addEventListener('blur', () => { pointerOn = false; });
-
-    function updateIris(dt, now) {
-        const prev = iris.h;
-
-        if (pointerOn) {
-            const k = 1 - Math.exp(-dt * CFG.follow);
-            sx += (tx - sx) * k;
-            sy += (ty - sy) * k;
-        }
-
-        const on = pointerOn || now < holdUntil;
-
-        if (on) {
-            if (iris.h < 0.02) { iris.ox = sx; iris.oy = sy; }
-            else {
-                const k = 1 - Math.exp(-dt * CFG.origin);
-                iris.ox += (sx - iris.ox) * k;
-                iris.oy += (sy - iris.oy) * k;
-            }
-            iris.h += (1 - iris.h) * (1 - Math.exp(-dt * CFG.morphIn));
-            if (iris.h > 0.999) iris.h = 1;
-        } else if (iris.h > 0) {
-            iris.h -= iris.h * (1 - Math.exp(-dt * CFG.morphOut));
-            if (iris.h < 0.003) iris.h = 0;
-        }
-
-        return iris.h !== prev;
-    }
-
-    const ss = v => v * v * (3 - 2 * v);
-    const cl = v => v < 0 ? 0 : v > 1 ? 1 : v;
-    const hasRR = typeof ctx.roundRect === 'function';
-
-    function drawPhoto(reach, F) {
-        const pr = reach - F * 0.35;
-        if (pr < 0.5) return;
-
-        const source = hoverReady ? midHover : mid;
-        lctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-        lctx.globalCompositeOperation = 'source-over';
-        lctx.clearRect(0, 0, D, D);
-        lctx.save();
-        lctx.beginPath();
-        lctx.arc(D * 0.5, D * 0.5, D * 0.5 * 0.99, 0, TAU);
-        lctx.clip();
-        lctx.imageSmoothingEnabled = true;
-        lctx.imageSmoothingQuality = 'high';
-        const dd = D * CFG.zoom / CFG.artCircle;
-        lctx.drawImage(source, D * 0.5 + CFG.offsetX * D - dd * 0.5,
-            D * 0.5 + CFG.offsetY * D - dd * 0.5, dd, dd);
-        lctx.restore();
-
-        lctx.globalCompositeOperation = 'destination-in';
-        const g = lctx.createRadialGradient(iris.ox, iris.oy, 0, iris.ox, iris.oy, pr);
-        const k = Math.max(0, (pr - F) / pr);
-        g.addColorStop(0, 'rgba(0,0,0,1)');
-        g.addColorStop(k, 'rgba(0,0,0,1)');
-        g.addColorStop(k + (1 - k) * 0.25, 'rgba(0,0,0,.84)');
-        g.addColorStop(k + (1 - k) * 0.50, 'rgba(0,0,0,.50)');
-        g.addColorStop(k + (1 - k) * 0.75, 'rgba(0,0,0,.16)');
-        g.addColorStop(1, 'rgba(0,0,0,0)');
-        lctx.fillStyle = g;
-        lctx.fillRect(0, 0, D, D);
-
-        ctx.drawImage(layer, 0, 0, D, D);
-    }
-
-    function render(now) {
         ctx.clearRect(0, 0, D, D);
-        if (!colourStr) return;
 
-        const F = CFG.feather * D;
-        const half = D * 0.5;
-        const Rmax = Math.hypot(iris.ox - half, iris.oy - half) + half;
-        const reach = iris.h * (Rmax + F);
-        const covered = iris.h >= 1;
+        // Clip to circular avatar
+        ctx.beginPath();
+        ctx.arc(D * 0.5, D * 0.5, D * 0.5, 0, TAU);
+        ctx.clip();
 
-        if (!covered) {
-            const maxS = CFG.maxSize, minS = CFG.minSize;
-            const maxE0 = 1.04;
-            const invF = F > 0 ? 1 / F : 0;
-            const colW = cols;
-            const mid0 = colW * 0.5, reachC = mid0 + 1;
-            const invRC = 1 / reachC;
+        // 1. Draw base photo (Basawaraj's photo)
+        drawCover(ctx, baseImg, D);
 
-            for (let a = 0; a < A; a++) {
-                const px = ax[a], py = ay[a];
-                const idx = aIdx[a];
+        // 2. Draw hover reveal (Joyboy) if active
+        if (hoverReady && h > 0) {
+            if (h >= 0.999) {
+                // Fully revealed: draw directly without mask
+                drawCover(ctx, hoverImg, D);
+            } else {
+                const half = D * 0.5;
+                const Rmax = Math.hypot(ox - half, oy - half) + half;
+                const F = D * CFG.feather;
+                const reach = h * (Rmax + F);
+                const pr = reach - F * 0.35;
 
-                const w = iris.h > 0
-                    ? ss(cl((reach - Math.hypot(px - iris.ox, py - iris.oy)) * invF))
-                    : 0;
+                if (pr >= 0.5) {
+                    const gradRadius = Math.max(0.5, pr);
+                    lctx.save();
+                    lctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+                    lctx.clearRect(0, 0, D, D);
 
-                let s = shrink[idx] * (1 - w);
-                let grow = 1;
+                    // Clip layer to circle
+                    lctx.beginPath();
+                    lctx.arc(D * 0.5, D * 0.5, D * 0.5, 0, TAU);
+                    lctx.clip();
 
-                if (introOn) {
-                    let u = (now - introT0 - adc[a] * invRC * CFG.introDelay) / CFG.introDur;
-                    if (u <= 0) continue;
-                    if (u >= 1) u = 1;
-                    else u = 1 - (1 - u) * (1 - u) * (1 - u);
-                    grow = u;
-                    const inv = 1 - u;
-                    if (inv > s) s = inv;
-                }
+                    // Draw Joyboy on layer
+                    drawCover(lctx, hoverImg, D);
 
-                const maxE = maxS + (maxE0 - maxS) * w;
-                const sz = cell * (maxE + (minS - maxE) * s) * grow;
-                if (sz < 0.4) continue;
+                    // Apply soft radial iris mask
+                    lctx.globalCompositeOperation = 'destination-in';
+                    const g = lctx.createRadialGradient(ox, oy, 0, ox, oy, gradRadius);
+                    const k = Math.max(0, Math.min(1, (gradRadius - F) / gradRadius));
+                    g.addColorStop(0, 'rgba(0,0,0,1)');
+                    g.addColorStop(k, 'rgba(0,0,0,1)');
+                    g.addColorStop(k + (1 - k) * 0.25, 'rgba(0,0,0,0.84)');
+                    g.addColorStop(k + (1 - k) * 0.50, 'rgba(0,0,0,0.50)');
+                    g.addColorStop(k + (1 - k) * 0.75, 'rgba(0,0,0,0.16)');
+                    g.addColorStop(1, 'rgba(0,0,0,0)');
+                    lctx.fillStyle = g;
+                    lctx.fillRect(0, 0, D, D);
+                    lctx.restore();
 
-                const cor = CFG.corner * (1 - w);
-                const rad = sz * (cor + (0.5 - cor) * ss(cl((s - 0.15) / 0.6)));
-                const x = px - sz * 0.5;
-                const y = py - sz * 0.5;
-
-                ctx.fillStyle = colourStr[idx];
-
-                if (rad < 0.5) ctx.fillRect(x, y, sz, sz);
-                else if (rad >= sz * 0.5 - 0.2) {
-                    ctx.beginPath();
-                    ctx.arc(px, py, sz * 0.5, 0, TAU);
-                    ctx.fill();
-                } else if (hasRR) {
-                    ctx.beginPath();
-                    ctx.roundRect(x, y, sz, sz, rad);
-                    ctx.fill();
-                } else {
-                    ctx.beginPath();
-                    ctx.arc(px, py, rad * 1.1, 0, TAU);
-                    ctx.fill();
+                    // Composite layer onto main canvas 1:1 in physical pixels
+                    ctx.save();
+                    ctx.setTransform(1, 0, 0, 1, 0, 0);
+                    ctx.drawImage(layer, 0, 0);
+                    ctx.restore();
                 }
             }
         }
 
-        if (iris.h > 0 && imgReady) drawPhoto(reach, F);
+        ctx.restore();
     }
 
-    let last = performance.now();
-    function frame(now) {
-        requestAnimationFrame(frame);
-        const dt = Math.min(0.05, Math.max(0.001, (now - last) / 1000));
-        last = now;
+    function startLoop() {
+        if (!rafId) {
+            lastTime = performance.now();
+            rafId = requestAnimationFrame(loop);
+        }
+    }
 
-        const moving = imgReady ? updateIris(dt, now) : false;
+    function loop(now) {
+        const dt = Math.min(0.05, Math.max(0.001, (now - lastTime) / 1000));
+        lastTime = now;
 
-        let intro = false;
-        if (introOn) {
-            if (now < introEnd) intro = true;
-            else { introOn = false; needs = true; }
+        let continueLoop = false;
+
+        if (isHovered) {
+            // Smoothly ease iris center toward cursor target
+            const followK = 1 - Math.exp(-dt * CFG.followSpeed);
+            ox += (tx - ox) * followK;
+            oy += (ty - oy) * followK;
+
+            // Expand iris toward 1.0
+            const morphK = 1 - Math.exp(-dt * CFG.morphIn);
+            h += (1 - h) * morphK;
+            if (h > 0.998) {
+                h = 1;
+            } else {
+                continueLoop = true;
+            }
+
+            // Keep tracking while cursor is moving
+            if (Math.abs(tx - ox) > 0.2 || Math.abs(ty - oy) > 0.2) {
+                continueLoop = true;
+            }
+        } else {
+            // Contract iris toward 0.0
+            const morphK = 1 - Math.exp(-dt * CFG.morphOut);
+            h -= h * morphK;
+            if (h < 0.003) {
+                h = 0;
+            } else {
+                continueLoop = true;
+            }
         }
 
-        const live = moving || intro || needs;
-        if (live || wasLive) render(now);
-        wasLive = live;
-        needs = false;
+        render();
+
+        if (continueLoop) {
+            rafId = requestAnimationFrame(loop);
+        } else {
+            rafId = null;
+        }
     }
 
-    let rz = 0;
-    new ResizeObserver(() => {
-        cancelAnimationFrame(rz);
-        rz = requestAnimationFrame(resize);
-    }).observe(wrap);
+    function setPointerPos(e) {
+        const rect = canvas.getBoundingClientRect();
+        const scale = rect.width ? D / rect.width : 1;
+        tx = (e.clientX - rect.left) * scale;
+        ty = (e.clientY - rect.top) * scale;
+        tx = Math.max(0, Math.min(D, tx));
+        ty = Math.max(0, Math.min(D, ty));
+    }
+
+    function onPointerEnter(e) {
+        setPointerPos(e);
+        if (h < 0.05) {
+            ox = tx;
+            oy = ty;
+        }
+        isHovered = true;
+        startLoop();
+    }
+
+    function onPointerMove(e) {
+        setPointerPos(e);
+        if (!isHovered) {
+            if (h < 0.05) {
+                ox = tx;
+                oy = ty;
+            }
+            isHovered = true;
+        }
+        startLoop();
+    }
+
+    function onPointerLeave() {
+        if (touchHoldTimer) return;
+        isHovered = false;
+        startLoop();
+    }
+
+    wrap.addEventListener('pointerenter', onPointerEnter);
+    wrap.addEventListener('pointermove', onPointerMove, { passive: true });
+    wrap.addEventListener('pointerleave', onPointerLeave);
+    wrap.addEventListener('pointercancel', onPointerLeave);
+    window.addEventListener('blur', onPointerLeave);
+
+    // Touch support
+    wrap.addEventListener('touchstart', e => {
+        if (e.touches && e.touches[0]) {
+            setPointerPos(e.touches[0]);
+            if (h < 0.05) {
+                ox = tx;
+                oy = ty;
+            }
+            isHovered = true;
+            startLoop();
+
+            clearTimeout(touchHoldTimer);
+            touchHoldTimer = setTimeout(() => {
+                touchHoldTimer = null;
+                isHovered = false;
+                startLoop();
+            }, CFG.holdTouch);
+        }
+    }, { passive: true });
+
+    // Preload images
+    baseImg.onload = () => {
+        baseReady = true;
+        wrap.classList.add('loaded');
+        setNote('');
+        resize();
+    };
+    baseImg.onerror = () => {
+        setNote('Image failed to load');
+    };
+    baseImg.src = AVATAR_PHOTO;
+
+    hoverImg.onload = () => {
+        hoverReady = true;
+    };
+    hoverImg.src = HOVER_PHOTO;
+
+    // Observe size changes
+    if (window.ResizeObserver) {
+        new ResizeObserver(() => {
+            resize();
+        }).observe(wrap);
+    } else {
+        window.addEventListener('resize', resize, { passive: true });
+    }
+
+    if (window.__onPortfolio) {
+        window.__onPortfolio(() => resize());
+    }
 
     resize();
-    requestAnimationFrame(frame);
 })();
 
 /* ============================================================
