@@ -85,6 +85,11 @@ window.__onPortfolio = function (fn) {
         if (ox === 0 && oy === 0) {
             ox = tx = D * 0.5;
             oy = ty = D * 0.5;
+        } else {
+            ox = Math.min(ox, D);
+            oy = Math.min(oy, D);
+            tx = Math.min(tx, D);
+            ty = Math.min(ty, D);
         }
 
         render();
@@ -286,6 +291,10 @@ window.__onPortfolio = function (fn) {
 
     hoverImg.onload = () => {
         hoverReady = true;
+        if (isHovered || h > 0) {
+            render();
+            startLoop();
+        }
     };
     hoverImg.src = HOVER_PHOTO;
 
@@ -369,8 +378,6 @@ window.__onPortfolio = function (fn) {
     }
 
     function startGreeting() {
-        body.classList.add('greeting-on');
-
         if (reduce) {
             showOnlyNice();
             after(1800, exitGreeting);
@@ -478,7 +485,6 @@ window.__onPortfolio = function (fn) {
         killTimers();
         finished = true;
         burst = true;
-        body.classList.add('greeting-on');
         body.setAttribute('aria-busy', 'false');
         showOnlyNice();
         setTimeout(() => {
@@ -763,7 +769,7 @@ window.__onPortfolio = function (fn) {
     }
 
     resumeBtn.addEventListener('click', () => {
-        toast('Resume coming soon');
+        toast('Resume · soon');
         if (REDUCED) return;
         resumeBtn.classList.remove('nudge');
         void resumeBtn.offsetWidth;
@@ -779,6 +785,37 @@ window.__onPortfolio = function (fn) {
         const label = cursor.querySelector('.label');
 
         let tx = 0, ty = 0, x = 0, y = 0, init = false;
+        let cursorRaf = null;
+
+        function startCursorLoop() {
+            if (!cursorRaf) {
+                cursorRaf = requestAnimationFrame(loopCursor);
+            }
+        }
+
+        function loopCursor() {
+            const dx = tx - x, dy = ty - y;
+
+            if (Math.abs(dx) > 0.03 || Math.abs(dy) > 0.03) {
+                x += dx * 0.14;
+                y += dy * 0.14;
+                cursor.style.transform = 'translate3d(' + x + 'px, ' + y + 'px, 0)';
+
+                const speed = Math.min(Math.hypot(dx, dy), 30) / 30;
+                const stretch = 1 + speed * 0.32;
+                const squash = 1 - speed * 0.16;
+                const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+                dot.style.transform = 'rotate(' + angle + 'deg) scale(' + stretch + ', ' + squash + ') rotate(' + (-angle) + 'deg)';
+
+                cursorRaf = requestAnimationFrame(loopCursor);
+            } else {
+                x = tx;
+                y = ty;
+                cursor.style.transform = 'translate3d(' + x + 'px, ' + y + 'px, 0)';
+                dot.style.transform = '';
+                cursorRaf = null;
+            }
+        }
 
         document.addEventListener('pointermove', (e) => {
             tx = e.clientX; ty = e.clientY;
@@ -792,33 +829,21 @@ window.__onPortfolio = function (fn) {
             const margin = 120;
             cursor.classList.toggle('flip-x', tx > window.innerWidth - margin);
             cursor.classList.toggle('flip-y', ty > window.innerHeight - margin);
+            startCursorLoop();
         }, { passive: true });
 
         document.documentElement.addEventListener('mouseleave', () => { cursor.style.opacity = 0; });
-        document.documentElement.addEventListener('mouseenter', () => { if (init) cursor.style.opacity = 1; });
+        document.documentElement.addEventListener('mouseenter', () => {
+            if (init) {
+                cursor.style.opacity = 1;
+                startCursorLoop();
+            }
+        });
 
         document.addEventListener('pointerdown', () => cursor.classList.add('down'));
         document.addEventListener('pointerup', () => cursor.classList.remove('down'));
         document.addEventListener('pointercancel', () => cursor.classList.remove('down'));
         window.addEventListener('blur', () => cursor.classList.remove('down'));
-
-        (function loop() {
-            const dx = tx - x, dy = ty - y;
-
-            if (Math.abs(dx) > 0.03 || Math.abs(dy) > 0.03) {
-                x += dx * 0.14;
-                y += dy * 0.14;
-                cursor.style.transform = 'translate3d(' + x + 'px, ' + y + 'px, 0)';
-
-                const speed = Math.min(Math.hypot(dx, dy), 30) / 30;
-                const stretch = 1 + speed * 0.32;
-                const squash = 1 - speed * 0.16;
-                const angle = Math.atan2(dy, dx) * 180 / Math.PI;
-                dot.style.transform = 'rotate(' + angle + 'deg) scale(' + stretch + ', ' + squash + ') rotate(' + (-angle) + 'deg)';
-            }
-
-            requestAnimationFrame(loop);
-        })();
 
         const STAGGER = 22;
         const OUT_DUR = 260;
@@ -930,7 +955,13 @@ window.__onPortfolio = function (fn) {
     function typeInto(el, { delay = 250, speed = 75, holdCursor = 2500 } = {}) {
         const text = el.dataset.text || el.textContent || '';
         el.textContent = '';
+        el.setAttribute('role', 'text');
         el.setAttribute('aria-label', text);
+
+        const sr = document.createElement('span');
+        sr.className = 'sr-only';
+        sr.textContent = text;
+        el.appendChild(sr);
 
         const chars = [...text].map(ch => {
             const s = document.createElement('span');

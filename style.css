@@ -91,11 +91,17 @@ body {
     overflow: hidden;
     touch-action: none;
     -webkit-tap-highlight-color: transparent;
-    user-select: none;
-    -webkit-user-select: none;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
+}
+
+.avatar,
+.pill,
+.site-footer,
+.greeting {
+    user-select: none;
+    -webkit-user-select: none;
 }
 
 ::selection {
@@ -289,7 +295,7 @@ body.reveal .stage {
     align-items: center;
     justify-content: center;
     gap: clamp(28px, 5vh, 48px);
-    min-height: calc(100dvh - clamp(120px, 17vh, 168px) - var(--footer-h));
+    min-height: calc(100dvh - clamp(96px, 13vh, 128px) - var(--footer-h) - 40px);
     text-align: center;
 }
 
@@ -323,7 +329,7 @@ body.reveal .stage {
     font-size: clamp(0.95rem, 1.35vw, 1.2rem);
     font-weight: 500;
     letter-spacing: -0.005em;
-    color: #000;
+    color: var(--text);
     white-space: nowrap;
     line-height: 1;
 }
@@ -367,6 +373,12 @@ body.reveal .stage {
     width: 100%;
     height: 100%;
     display: block;
+    opacity: 0;
+    transition: opacity var(--normal) var(--ease-out);
+}
+
+.avatar.loaded .disc canvas {
+    opacity: 1;
 }
 
 .note {
@@ -397,12 +409,14 @@ body.reveal .stage {
     font-size: clamp(1rem, 1.15vw, 1.125rem);
     line-height: 1.7;
     letter-spacing: -0.012em;
-    color: #2a2a2a;
+    color: var(--text);
+    opacity: 0.88;
     text-wrap: pretty;
 }
 
 [data-theme="dark"] .quality-bio {
     color: rgba(246, 248, 252, .78);
+    opacity: 1;
 }
 
 /* ---------- Typewriter caret ---------- */
@@ -1035,6 +1049,10 @@ body.reveal .stage {
         padding-bottom: calc(var(--footer-h) + 28px);
     }
 
+    #page-me.is-active {
+        min-height: calc(100dvh - 84px - var(--footer-h) - 28px);
+    }
+
     .sheet__head h1 {
         font-size: 33px;
         letter-spacing: -0.026em;
@@ -1057,7 +1075,7 @@ body.reveal .stage {
     }
 
     #page-me.is-active {
-        min-height: calc(100dvh - clamp(132px, 16vh, 172px) - var(--footer-h));
+        min-height: calc(100dvh - clamp(104px, 13vh, 136px) - var(--footer-h) - 48px);
     }
 }
 

@@ -4,17 +4,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="color-scheme" content="light">
+    <meta name="color-scheme" content="light dark">
     <title>Basawaraj — Can machines really think?</title>
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://gstatic.com" crossorigin>
     <link
         href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300..900&family=JetBrains+Mono:wght@400;500&display=swap"
         rel="stylesheet">
 
     <script>
-        document.documentElement.dataset.theme = 'light';
+        const savedTheme = localStorage.getItem('theme');
+        const systemDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        document.documentElement.dataset.theme = savedTheme || (systemDark ? 'dark' : 'light');
     </script>
 
     <link rel="stylesheet" href="style.css">
@@ -66,12 +68,12 @@
         <div class="hellos" id="hellos" aria-live="polite"></div>
     </div>
 
-    <div class="stage" id="stage">
+    <div id="cursor" aria-hidden="true">
+        <span class="dot"></span>
+        <span class="label"></span>
+    </div>
 
-        <div id="cursor" aria-hidden="true">
-            <span class="dot"></span>
-            <span class="label"></span>
-        </div>
+    <div class="stage" id="stage">
 
         <div class="pill" id="pill">
             <span class="pill__thumb" id="pillThumb" aria-hidden="true"></span>
@@ -84,7 +86,7 @@
                 aria-label="Experience"><i data-lucide="briefcase"></i></button>
 
             <button class="item item--resume" id="resumeBtn" type="button" style="--i:3" data-cursor="Resume · soon"
-                aria-label="Resume (coming soon)">
+                aria-label="Resume (soon)">
                 <i data-lucide="download"></i>
             </button>
         </div>
@@ -122,7 +124,7 @@
                     </header>
 
                     <div class="exp-section" data-enter>
-                        <p class="coming-soon" id="projectsComingSoon" data-text="Coming Soon">Still have to vibe code</p>
+                        <p class="coming-soon" id="projectsComingSoon" data-text="Still have to vibe code">Still have to vibe code</p>
                     </div>
                 </section>
 
@@ -134,7 +136,7 @@
                     </header>
 
                     <div class="exp-section" data-enter>
-                        <p class="coming-soon" id="experienceComingSoon" data-text="Coming Soon">Still have to vibe code</p>
+                        <p class="coming-soon" id="experienceComingSoon" data-text="Still have to vibe code">Still have to vibe code</p>
                     </div>
                 </section>
 
