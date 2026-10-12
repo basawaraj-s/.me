@@ -58,6 +58,12 @@
             .type-cursor {
                 display: none !important;
             }
+
+            .theme-slider {
+                opacity: 1 !important;
+                visibility: visible !important;
+                pointer-events: auto !important;
+            }
         </style>
     </noscript>
 </head>
@@ -71,6 +77,32 @@
     <div id="cursor" aria-hidden="true">
         <span class="dot"></span>
         <span class="label"></span>
+    </div>
+
+    <!-- THEME SLIDER (drag towards right for real-time dual-theme split transition) -->
+    <div class="theme-split-line" id="themeSplitLine" aria-hidden="true"></div>
+    <div class="theme-slider" id="themeSlider" aria-label="Theme mode slider">
+        <button class="theme-handle" id="themeHandle" type="button" aria-label="Toggle theme mode"
+            data-cursor="Slide for White">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                class="theme-icon theme-icon--sun" aria-hidden="true">
+                <circle cx="12" cy="12" r="4" />
+                <path d="M12 2v2" />
+                <path d="M12 20v2" />
+                <path d="m4.93 4.93 1.41 1.41" />
+                <path d="m17.66 17.66 1.41 1.41" />
+                <path d="M2 12h2" />
+                <path d="M20 12h2" />
+                <path d="m6.34 17.66-1.41 1.41" />
+                <path d="m19.07 4.93-1.41 1.41" />
+            </svg>
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                class="theme-icon theme-icon--moon" aria-hidden="true">
+                <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />
+            </svg>
+        </button>
     </div>
 
     <div class="stage" id="stage">
@@ -124,7 +156,8 @@
                     </header>
 
                     <div class="exp-section" data-enter>
-                        <p class="coming-soon" id="projectsComingSoon" data-text="Still have to vibe code">Still have to vibe code</p>
+                        <p class="coming-soon" id="projectsComingSoon" data-text="Still have to vibe code">Still have to
+                            vibe code</p>
                     </div>
                 </section>
 
@@ -136,7 +169,8 @@
                     </header>
 
                     <div class="exp-section" data-enter>
-                        <p class="coming-soon" id="experienceComingSoon" data-text="Still have to vibe code">Still have to vibe code</p>
+                        <p class="coming-soon" id="experienceComingSoon" data-text="Still have to vibe code">Still have
+                            to vibe code</p>
                     </div>
                 </section>
 

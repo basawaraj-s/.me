@@ -899,11 +899,16 @@ window.__onPortfolio = function (fn) {
 
         let hovering = false;
         let prevLeft = null;
-        const HOVER_SEL = '.item, .footer-link';
+        const HOVER_SEL = '.item, .footer-link, .theme-handle';
 
-        const labelFor = (t) => t.classList.contains('footer-link')
-            ? t.textContent.trim().replace(/\s*↗\s*$/, '')
-            : t.dataset.cursor;
+        const labelFor = (t) => {
+            if (t.classList.contains('footer-link')) return t.textContent.trim().replace(/\s*↗\s*$/, '');
+            if (t.id === 'themeHandle') {
+                const isDark = (document.documentElement.dataset.theme || 'light') === 'dark';
+                return isDark ? 'Slide for White' : 'Slide for Black';
+            }
+            return t.dataset.cursor;
+        };
 
         function showPageLabel(dir) {
             swapLabel(pageLabel, dir || 1);
@@ -1007,4 +1012,323 @@ window.__onPortfolio = function (fn) {
 
     watch('projectsComingSoon', 'page-projects');
     watch('experienceComingSoon', 'page-experience');
+
+    /* ============================================================
+       THEME SLIDER & REAL-TIME DUAL-THEME TRANSITION
+       ============================================================ */
+    const themeSlider = document.getElementById('themeSlider');
+    const themeHandle = document.getElementById('themeHandle');
+    const themeSplitLine = document.getElementById('themeSplitLine');
+    const stageEl = document.getElementById('stage') || document.body;
+
+    if (themeHandle) {
+        let isDragging = false;
+        let startX = 0;
+        let currentX = 0;
+        let pendingX = 0;
+        let targetTheme = 'light';
+        let animating = false;
+        let splitLayer = null;
+        let stageRect = null;
+        let maxDragW = 0;
+        let rafId = null;
+
+        function getTheme() {
+            return document.documentElement.dataset.theme || 'light';
+        }
+
+        function getSide() {
+            if (themeSlider && themeSlider.dataset.side) {
+                return themeSlider.dataset.side;
+            }
+            return getTheme() === 'dark' ? 'left' : 'right';
+        }
+
+        function updateSide() {
+            const side = getTheme() === 'dark' ? 'left' : 'right';
+            if (themeSlider) themeSlider.dataset.side = side;
+        }
+
+        function updateCursor() {
+            const isDark = getTheme() === 'dark';
+            themeHandle.dataset.cursor = isDark ? 'Slide for White' : 'Slide for Black';
+        }
+
+        updateSide();
+        updateCursor();
+
+        function createSplitLayer(target) {
+            if (splitLayer) {
+                splitLayer.remove();
+                splitLayer = null;
+            }
+
+            stageRect = stageEl.getBoundingClientRect();
+            const stageW = stageRect.width || (window.innerWidth - 16);
+            const handleW = themeHandle.offsetWidth || 24;
+            maxDragW = Math.max(10, stageW - handleW);
+            const side = getSide();
+
+            // 1. Full-screen split container with target theme variables
+            splitLayer = document.createElement('div');
+            splitLayer.className = 'theme-split-layer';
+            splitLayer.dataset.theme = target;
+
+            // 2. Clone stage and copy exact visual state
+            const clone = stageEl.cloneNode(true);
+            clone.dataset.theme = target;
+
+            // Prefix IDs in clone to avoid collisions while keeping structure intact
+            clone.querySelectorAll('[id]').forEach(el => {
+                el.id = 'split-clone-' + el.id;
+            });
+
+            // Remove theme slider and split line from inside the clone
+            clone.querySelectorAll('.theme-slider, .theme-split-line').forEach(el => el.remove());
+
+            // Synchronize canvas pixels (avatar portrait)
+            const origArt = document.getElementById('art');
+            const cloneArt = clone.querySelector('canvas');
+            if (origArt && cloneArt) {
+                cloneArt.width = origArt.width;
+                cloneArt.height = origArt.height;
+                const ctx = cloneArt.getContext('2d');
+                if (ctx) ctx.drawImage(origArt, 0, 0);
+            }
+
+            // Synchronize scroll position
+            const origPage = document.getElementById('page');
+            const clonePage = clone.querySelector('.page');
+            if (origPage && clonePage) {
+                clonePage.scrollTop = origPage.scrollTop;
+            }
+
+            splitLayer.appendChild(clone);
+
+            // Initial clip depending on starting side
+            if (side === 'left') {
+                const initCut = stageRect.left;
+                splitLayer.style.clipPath = 'inset(0 calc(100% - ' + initCut + 'px) 0 0)';
+                if (themeSplitLine) {
+                    themeSplitLine.style.transform = 'translate3d(' + (initCut - 1) + 'px, 0, 0)';
+                }
+            } else {
+                const initCut = stageRect.right;
+                splitLayer.style.clipPath = 'inset(0 0 0 ' + initCut + 'px)';
+                if (themeSplitLine) {
+                    themeSplitLine.style.transform = 'translate3d(' + (initCut - 1) + 'px, 0, 0)';
+                }
+            }
+
+            document.body.appendChild(splitLayer);
+
+            // Activate split line
+            if (themeSplitLine) {
+                themeSplitLine.classList.add('is-active');
+            }
+        }
+
+        function setSplitPosition(x) {
+            currentX = x;
+            const side = getSide();
+            const stageW = stageRect ? stageRect.width : (stageEl.clientWidth || (window.innerWidth - 16));
+            const handleW = themeHandle.offsetWidth || 24;
+            const maxTravel = Math.max(1, stageW - handleW);
+            const p = Math.max(0, Math.min(1, x / maxTravel));
+
+            if (side === 'left') {
+                themeHandle.style.transform = 'translate3d(' + x + 'px, -50%, 0)';
+                const stageLeft = stageRect ? stageRect.left : 8;
+                const cutX = stageLeft + p * stageW;
+
+                if (splitLayer) {
+                    splitLayer.style.clipPath = 'inset(0 calc(100% - ' + cutX + 'px) 0 0)';
+                }
+                if (themeSplitLine) {
+                    themeSplitLine.style.transform = 'translate3d(' + (cutX - 1) + 'px, 0, 0)';
+                }
+            } else {
+                themeHandle.style.transform = 'translate3d(' + (-x) + 'px, -50%, 0)';
+                const stageRight = stageRect ? stageRect.right : (window.innerWidth - 8);
+                const cutX = stageRight - p * stageW;
+
+                if (splitLayer) {
+                    splitLayer.style.clipPath = 'inset(0 0 0 ' + cutX + 'px)';
+                }
+                if (themeSplitLine) {
+                    themeSplitLine.style.transform = 'translate3d(' + (cutX - 1) + 'px, 0, 0)';
+                }
+            }
+        }
+
+        function renderFrame() {
+            rafId = null;
+            if (!isDragging && !animating) return;
+            setSplitPosition(pendingX);
+        }
+
+        function cleanUpSplit() {
+            if (splitLayer) {
+                splitLayer.remove();
+                splitLayer = null;
+            }
+            if (themeSplitLine) {
+                themeSplitLine.classList.remove('is-active');
+                themeSplitLine.style.transform = '';
+            }
+            themeHandle.style.transition = 'transform 320ms cubic-bezier(0.34, 1.56, 0.64, 1)';
+            themeHandle.style.transform = 'translate3d(0px, -50%, 0)';
+            setTimeout(() => {
+                themeHandle.style.transition = '';
+                animating = false;
+            }, 320);
+        }
+
+        function finishTransition(target) {
+            document.documentElement.classList.add('no-theme-transition');
+            document.documentElement.dataset.theme = target;
+            try { localStorage.setItem('theme', target); } catch (e) {}
+
+            // Dock handle to the new side
+            const newSide = target === 'dark' ? 'left' : 'right';
+            if (themeSlider) themeSlider.dataset.side = newSide;
+
+            themeHandle.style.transition = 'none';
+            themeHandle.style.transform = 'translate3d(0px, -50%, 0)';
+
+            if (splitLayer) {
+                splitLayer.remove();
+                splitLayer = null;
+            }
+            if (themeSplitLine) {
+                themeSplitLine.classList.remove('is-active');
+                themeSplitLine.style.transform = '';
+            }
+
+            updateCursor();
+
+            // Re-enable regular transitions on subsequent frame so no background transition lag occurs
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    document.documentElement.classList.remove('no-theme-transition');
+                    animating = false;
+                });
+            });
+        }
+
+        function animateSplit(fromX, toX, duration, easeStr, onComplete) {
+            animating = true;
+            if (typeof gsap !== 'undefined' && !REDUCED) {
+                const proxy = { x: fromX };
+                gsap.to(proxy, {
+                    x: toX,
+                    duration: duration / 1000,
+                    ease: easeStr || 'power2.out',
+                    onUpdate: () => setSplitPosition(proxy.x),
+                    onComplete: () => {
+                        animating = false;
+                        if (onComplete) onComplete();
+                    }
+                });
+            } else {
+                const startTime = performance.now();
+                function step(now) {
+                    const progress = Math.min(1, (now - startTime) / duration);
+                    const eased = 1 - Math.pow(1 - progress, 3);
+                    const val = fromX + (toX - fromX) * eased;
+                    setSplitPosition(val);
+                    if (progress < 1) {
+                        requestAnimationFrame(step);
+                    } else {
+                        animating = false;
+                        if (onComplete) onComplete();
+                    }
+                }
+                requestAnimationFrame(step);
+            }
+        }
+
+        function onPointerMove(e) {
+            if (!isDragging || animating) return;
+            e.preventDefault();
+            const side = getSide();
+            const dx = side === 'left' ? (e.clientX - startX) : (startX - e.clientX);
+            const maxTravel = maxDragW || (stageEl.clientWidth - 24 || window.innerWidth - 40);
+            pendingX = Math.max(0, Math.min(maxTravel, dx));
+            if (!rafId) {
+                rafId = requestAnimationFrame(renderFrame);
+            }
+        }
+
+        function onPointerEnd(e) {
+            if (!isDragging) return;
+            isDragging = false;
+            if (rafId) {
+                cancelAnimationFrame(rafId);
+                rafId = null;
+            }
+
+            window.removeEventListener('pointermove', onPointerMove);
+            window.removeEventListener('pointerup', onPointerEnd);
+            window.removeEventListener('pointercancel', onPointerEnd);
+
+            themeHandle.classList.remove('is-dragging');
+            document.body.classList.remove('is-theme-dragging');
+
+            const side = getSide();
+            const dx = Math.max(0, side === 'left' ? (e.clientX - startX) : (startX - e.clientX));
+            const maxTravel = maxDragW || (stageEl.clientWidth - 24 || window.innerWidth - 40);
+            const threshold = Math.min(60, maxTravel * 0.15);
+
+            if (dx <= 4) {
+                // Click: animate real-time split sweep across full screen to opposite side
+                animateSplit(0, maxTravel, 420, 'power2.inOut', () => finishTransition(targetTheme));
+            } else if (dx >= threshold) {
+                // Dragged past threshold: complete the wipe to the opposite edge and dock there
+                const remainingW = maxTravel - currentX;
+                const dur = Math.max(180, Math.min(380, (remainingW / maxTravel) * 400));
+                animateSplit(currentX, maxTravel, dur, 'power2.out', () => finishTransition(targetTheme));
+            } else {
+                // Released below threshold: spring back to home edge
+                const dur = Math.max(160, Math.min(280, (currentX / threshold) * 260));
+                animateSplit(currentX, 0, dur, 'power2.out', cleanUpSplit);
+            }
+        }
+
+        themeHandle.addEventListener('pointerdown', (e) => {
+            if (e.button !== undefined && e.button !== 0) return;
+            if (animating) return;
+            e.preventDefault(); // Prevents browser text drag / selection abort
+
+            isDragging = true;
+            startX = e.clientX;
+            currentX = 0;
+            pendingX = 0;
+
+            const cur = getTheme();
+            targetTheme = cur === 'dark' ? 'light' : 'dark';
+
+            createSplitLayer(targetTheme);
+
+            themeHandle.classList.add('is-dragging');
+            themeHandle.style.transition = 'none';
+            document.body.classList.add('is-theme-dragging');
+
+            window.addEventListener('pointermove', onPointerMove, { passive: false });
+            window.addEventListener('pointerup', onPointerEnd);
+            window.addEventListener('pointercancel', onPointerEnd);
+        });
+
+        themeHandle.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                if (animating) return;
+                const cur = getTheme();
+                targetTheme = cur === 'dark' ? 'light' : 'dark';
+                createSplitLayer(targetTheme);
+                const maxTravel = maxDragW || (stageEl.clientWidth - 24 || window.innerWidth - 40);
+                animateSplit(0, maxTravel, 420, 'power2.inOut', () => finishTransition(targetTheme));
+            }
+        });
+    }
 })();
