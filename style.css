@@ -10,7 +10,7 @@
 
     --blue: #5a5de6;
 
-    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --font: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
     --font-sans: var(--font);
     --ease: cubic-bezier(.22, .8, .24, 1);
@@ -25,16 +25,16 @@
 
     --footer-h: 30px;
 
-    --stage-radius: 6px; /* Sharp but curved radius */
-    --stage-radius-mobile: 5px;
-    --stage-inset: 8px;
+    --stage-radius: 0px;
+    --stage-radius-mobile: 0px;
+    --stage-inset: 0px;
 }
 
 [data-theme="dark"] {
     --bg: #09090b;
-    --page-bg: #141416;
-    --stage-border: rgba(255, 255, 255, .08);
-    --stage-shadow: 0 0 0 1px rgba(0, 0, 0, .4), 0 8px 32px rgba(0, 0, 0, .45);
+    --page-bg: #09090b;
+    --stage-border: transparent;
+    --stage-shadow: none;
     --text: #f6f8fc;
     --text-muted: rgba(246, 248, 252, .60);
     --pill-bg: rgba(28, 28, 28, .78);
@@ -47,9 +47,9 @@
     --fg: rgba(255, 255, 255, .7);
     --fg-muted: rgba(255, 255, 255, .4);
     --fg-hover: #ffffff;
-    --cursor-bg: #f2f1ec;
-    --cursor-fg: #121212;
-    --cursor-shadow: 0 8px 24px rgba(0, 0, 0, .35);
+    --toast-bg: #f2f1ec;
+    --toast-fg: #121212;
+    --toast-shadow: 0 8px 24px rgba(0, 0, 0, .35);
 
     --footer-text: rgba(255, 255, 255, .55);
     --footer-text-hover: #ffffff;
@@ -57,10 +57,10 @@
 }
 
 [data-theme="light"] {
-    --bg: #f2f3f5;
+    --bg: #ffffff;
     --page-bg: #ffffff;
-    --stage-border: rgba(0, 0, 0, .08);
-    --stage-shadow: 0 0 0 1px rgba(0, 0, 0, .02), 0 4px 20px rgba(0, 0, 0, .06);
+    --stage-border: transparent;
+    --stage-shadow: none;
     --text: #000000;
     --text-muted: rgba(0, 0, 0, .55);
     --pill-bg: rgba(255, 255, 255, .82);
@@ -73,9 +73,9 @@
     --fg: rgba(0, 0, 0, .62);
     --fg-muted: rgba(0, 0, 0, .35);
     --fg-hover: #0a0a0a;
-    --cursor-bg: #1a1a1a;
-    --cursor-fg: #ffffff;
-    --cursor-shadow: 0 8px 24px rgba(0, 0, 0, .15);
+    --toast-bg: #1a1a1a;
+    --toast-fg: #ffffff;
+    --toast-shadow: 0 8px 24px rgba(0, 0, 0, .15);
 
     --footer-text: rgba(0, 0, 0, .55);
     --footer-text-hover: #0a0a0a;
@@ -145,6 +145,48 @@ body.greeting-off .greeting {
     transition:
         background-color .9s var(--ease) .1s,
         visibility 0s linear 1500ms;
+}
+
+.greeting-skip {
+    position: absolute;
+    bottom: clamp(24px, 5vh, 48px);
+    left: 50%;
+    transform: translateX(-50%);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    border-radius: 999px;
+    background: var(--pill-bg);
+    border: 1px solid var(--pill-border);
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    cursor: pointer;
+    user-select: none;
+    -webkit-user-select: none;
+    pointer-events: auto;
+    z-index: 101;
+    opacity: 0.75;
+    transition: opacity var(--fast) var(--ease-out), transform var(--fast) var(--ease-out), color var(--fast) var(--ease-out);
+}
+
+.greeting-skip:hover {
+    opacity: 1;
+    color: var(--text);
+    transform: translateX(-50%) translateY(-1px);
+}
+
+.greeting-skip:active {
+    transform: translateX(-50%) scale(0.97);
+}
+
+body.greeting-off .greeting-skip {
+    opacity: 0;
+    pointer-events: none;
 }
 
 .hellos {
@@ -232,13 +274,13 @@ body.greeting-off .greeting {
    ============================================================ */
 .stage {
     position: fixed;
-    inset: var(--stage-inset);
-    width: auto;
-    height: auto;
+    inset: 0;
+    width: 100%;
+    height: 100%;
     background: var(--page-bg);
-    border-radius: var(--stage-radius);
-    border: 1px solid var(--stage-border);
-    box-shadow: var(--stage-shadow);
+    border-radius: 0;
+    border: none;
+    box-shadow: none;
     isolation: isolate;
     overflow: hidden;
     opacity: 0;
@@ -794,7 +836,7 @@ body.reveal .theme-slider {
 /* LEFT SIDE DOCK (Dark Mode / Slide Right for White) */
 .theme-slider[data-side="left"],
 .theme-slider:not([data-side="right"]) {
-    left: var(--stage-inset, 8px);
+    left: 0;
     right: auto;
 }
 
@@ -818,7 +860,7 @@ body.reveal .theme-slider {
 /* RIGHT SIDE DOCK (Light Mode / Slide Left for Black) */
 .theme-slider[data-side="right"] {
     left: auto;
-    right: var(--stage-inset, 8px);
+    right: 0;
 }
 
 .theme-slider[data-side="right"] .theme-handle {
@@ -853,12 +895,12 @@ body.reveal .theme-slider {
 
 .theme-split-layer .stage {
     position: fixed;
-    inset: var(--stage-inset);
-    width: auto;
-    height: auto;
-    border-radius: var(--stage-radius);
-    border: 1px solid var(--stage-border);
-    box-shadow: var(--stage-shadow);
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border-radius: 0;
+    border: none;
+    box-shadow: none;
     background: var(--page-bg);
     opacity: 1 !important;
     visibility: visible !important;
@@ -873,8 +915,8 @@ body.reveal .theme-slider {
 
 .theme-split-line {
     position: fixed;
-    top: var(--stage-inset, 8px);
-    bottom: var(--stage-inset, 8px);
+    top: 0;
+    bottom: 0;
     left: 0;
     width: 2px;
     background: var(--fg);
@@ -988,10 +1030,10 @@ html.no-theme-transition *::after {
     z-index: 200;
     padding: 10px 16px;
     border-radius: 12px;
-    background: var(--cursor-bg);
-    color: var(--cursor-fg);
+    background: var(--toast-bg);
+    color: var(--toast-fg);
     font: 500 13px/1 var(--font);
-    box-shadow: var(--cursor-shadow);
+    box-shadow: var(--toast-shadow);
     opacity: 0;
     transform: translate(-50%, 10px);
     pointer-events: none;
@@ -1182,11 +1224,6 @@ html.no-theme-transition *::after {
 }
 
 @media (max-width: 520px) {
-    .stage {
-        inset: 6px;
-        border-radius: var(--stage-radius-mobile);
-    }
-
     .theme-handle {
         width: 20px;
         height: 36px;

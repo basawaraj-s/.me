@@ -10,7 +10,8 @@ window.__onPortfolio = function (fn) {
    AVATAR (photo → Joyboy iris reveal on hover)
    ============================================================ */
 (() => {
-    const AVATAR_PHOTO = 'photo.png';
+    const AVATAR_PHOTO = 'photo.jpg';
+    const AVATAR_FALLBACK = 'photo.png';
     const HOVER_PHOTO = 'Joyboy.jpg';
 
     const wrap = document.getElementById('avatar');
@@ -316,7 +317,11 @@ window.__onPortfolio = function (fn) {
         resize();
     };
     baseImg.onerror = () => {
-        setNote('Image failed to load');
+        if (baseImg.src.indexOf('photo.jpg') !== -1) {
+            baseImg.src = AVATAR_FALLBACK;
+        } else {
+            setNote('Image failed to load');
+        }
     };
     baseImg.src = AVATAR_PHOTO;
 
@@ -503,7 +508,10 @@ window.__onPortfolio = function (fn) {
         if (window.__portfolioReady) return;
         window.__portfolioReady = true;
         removeSkipListeners();
+        try { sessionStorage.setItem('visited_portfolio', '1'); } catch (e) {}
+        body.classList.add('greeting-off');
         body.classList.add('reveal');
+        body.setAttribute('aria-busy', 'false');
         const q = window.__portfolioQueue;
         while (q.length) {
             const fn = q.shift();
@@ -521,7 +529,7 @@ window.__onPortfolio = function (fn) {
 
     let skipped = false;
     function skip() {
-        if (skipped || entered) return;
+        if (skipped || window.__portfolioReady) return;
         skipped = true;
         removeSkipListeners();
         killTimers();
@@ -532,22 +540,33 @@ window.__onPortfolio = function (fn) {
         setTimeout(() => {
             body.classList.add('greeting-off');
             enterPortfolio();
-        }, 500);
+        }, 350);
     }
+
+    const skipBtn = document.getElementById('greetingSkip');
+    if (skipBtn) skipBtn.addEventListener('click', skip);
 
     skipEvents.forEach(ev =>
         window.addEventListener(ev, skip, { passive: true })
     );
 
-    const begin = () => requestAnimationFrame(() => requestAnimationFrame(finish));
+    const hasHash = Boolean(window.location.hash && window.location.hash.length > 1);
+    let alreadyVisited = false;
+    try { alreadyVisited = sessionStorage.getItem('visited_portfolio') === '1'; } catch (e) {}
 
-    if (document.fonts && document.fonts.ready) {
-        Promise.race([
-            document.fonts.ready,
-            new Promise(r => setTimeout(r, 900))
-        ]).then(begin).catch(begin);
+    if (hasHash || alreadyVisited) {
+        body.classList.add('greeting-off');
+        enterPortfolio();
     } else {
-        begin();
+        const begin = () => requestAnimationFrame(() => requestAnimationFrame(finish));
+        if (document.fonts && document.fonts.ready) {
+            Promise.race([
+                document.fonts.ready,
+                new Promise(r => setTimeout(r, 900))
+            ]).then(begin).catch(begin);
+        } else {
+            begin();
+        }
     }
 })();
 
@@ -570,7 +589,6 @@ window.__onPortfolio = function (fn) {
     const resumeBtn = document.getElementById('resumeBtn');
     const toastEl = document.getElementById('toast');
 
-    const PAGE_LABELS = { me: 'Me', projects: 'Projects', experience: 'Experience' };
     const hasGsap = typeof window.gsap !== 'undefined';
     const animate = hasGsap && !REDUCED;
 
@@ -578,9 +596,18 @@ window.__onPortfolio = function (fn) {
     window.__onPortfolio(() => {
         requestAnimationFrame(() => requestAnimationFrame(() => {
             items.forEach(t => t.classList.add('in'));
-            setTimeout(() => pill.classList.add('settled'), 700);
+            setTimeout(() => {
+                pill.classList.add('settled');
+                if (activeNav) moveThumb(activeNav, false);
+            }, 700);
         }));
     });
+
+    if (document.fonts && document.fonts.ready) {
+        document.fonts.ready.then(() => {
+            if (activeNav) moveThumb(activeNav, false);
+        });
+    }
 
     items.forEach(item => {
         item.addEventListener('pointerenter', (e) => {
@@ -886,10 +913,13 @@ window.__onPortfolio = function (fn) {
 
     watch('projectsComingSoon', 'page-projects');
     watch('experienceComingSoon', 'page-experience');
+})();
 
-    /* ============================================================
-       THEME SLIDER & REAL-TIME DUAL-THEME TRANSITION
-       ============================================================ */
+/* ============================================================
+   THEME SLIDER & REAL-TIME DUAL-THEME TRANSITION
+   ============================================================ */
+(() => {
+    const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
     const themeSlider = document.getElementById('themeSlider');
     const themeHandle = document.getElementById('themeHandle');
     const themeSplitLine = document.getElementById('themeSplitLine');
@@ -940,7 +970,7 @@ window.__onPortfolio = function (fn) {
             }
 
             stageRect = stageEl.getBoundingClientRect();
-            const stageW = stageRect.width || (window.innerWidth - 16);
+            const stageW = stageRect.width || window.innerWidth;
             const handleW = themeHandle.offsetWidth || 24;
             maxDragW = Math.max(10, stageW - handleW);
             const side = getSide();
@@ -980,16 +1010,15 @@ window.__onPortfolio = function (fn) {
 
             // Initial clip depending on starting side
             if (side === 'left') {
-                const initCut = stageRect.left;
-                splitLayer.style.clipPath = 'inset(0 calc(100% - ' + initCut + 'px) 0 0)';
+                splitLayer.style.clipPath = 'polygon(0 0, 0 0, 0 100%, 0 100%)';
                 if (themeSplitLine) {
-                    themeSplitLine.style.transform = 'translate3d(' + (initCut - 1) + 'px, 0, 0)';
+                    themeSplitLine.style.transform = 'translate3d(-2px, 0, 0)';
                 }
             } else {
-                const initCut = stageRect.right;
-                splitLayer.style.clipPath = 'inset(0 0 0 ' + initCut + 'px)';
+                splitLayer.style.clipPath = 'polygon(100% 0, 100% 0, 100% 100%, 100% 100%)';
                 if (themeSplitLine) {
-                    themeSplitLine.style.transform = 'translate3d(' + (initCut - 1) + 'px, 0, 0)';
+                    const initX = stageRect.right || window.innerWidth;
+                    themeSplitLine.style.transform = 'translate3d(' + initX + 'px, 0, 0)';
                 }
             }
 
@@ -1003,31 +1032,31 @@ window.__onPortfolio = function (fn) {
         function setSplitPosition(x) {
             currentX = x;
             const side = getSide();
-            const stageW = stageRect ? stageRect.width : (stageEl.clientWidth || (window.innerWidth - 16));
+            const stageW = stageRect ? stageRect.width : (stageEl.clientWidth || window.innerWidth);
             const handleW = themeHandle.offsetWidth || 24;
             const maxTravel = Math.max(1, stageW - handleW);
             const progress = Math.max(0, Math.min(1, x / maxTravel));
 
             if (side === 'left') {
                 themeHandle.style.transform = 'translate3d(' + x + 'px, -50%, 0)';
-                const stageLeft = stageRect ? stageRect.left : 8;
+                const stageLeft = stageRect ? stageRect.left : 0;
                 // Mathematically exact boundary: starts at stageLeft, passes handle center, finishes at stageRight
-                const cutX = stageLeft + x + handleW * progress;
+                const cutX = Math.round(stageLeft + x + handleW * progress);
 
                 if (splitLayer) {
-                    splitLayer.style.clipPath = 'inset(0 calc(100% - ' + cutX + 'px) 0 0)';
+                    splitLayer.style.clipPath = 'polygon(0 0, ' + cutX + 'px 0, ' + cutX + 'px 100%, 0 100%)';
                 }
                 if (themeSplitLine) {
                     themeSplitLine.style.transform = 'translate3d(' + (cutX - 1) + 'px, 0, 0)';
                 }
             } else {
                 themeHandle.style.transform = 'translate3d(' + (-x) + 'px, -50%, 0)';
-                const stageRight = stageRect ? stageRect.right : (window.innerWidth - 8);
+                const stageRight = stageRect ? stageRect.right : window.innerWidth;
                 // Mathematically exact boundary: starts at stageRight, passes handle center, finishes at stageLeft
-                const cutX = stageRight - x - handleW * progress;
+                const cutX = Math.round(stageRight - x - handleW * progress);
 
                 if (splitLayer) {
-                    splitLayer.style.clipPath = 'inset(0 0 0 ' + cutX + 'px)';
+                    splitLayer.style.clipPath = 'polygon(' + cutX + 'px 0, 100% 0, 100% 100%, ' + cutX + 'px 100%)';
                 }
                 if (themeSplitLine) {
                     themeSplitLine.style.transform = 'translate3d(' + (cutX - 1) + 'px, 0, 0)';
@@ -1077,6 +1106,7 @@ window.__onPortfolio = function (fn) {
             }
 
             updateHandleA11y();
+            window.dispatchEvent(new CustomEvent('themechange', { detail: { theme: target } }));
 
             requestAnimationFrame(() => {
                 requestAnimationFrame(() => {
@@ -1096,7 +1126,6 @@ window.__onPortfolio = function (fn) {
                     ease: easeStr || 'power2.out',
                     onUpdate: () => setSplitPosition(proxy.x),
                     onComplete: () => {
-                        animating = false;
                         if (onComplete) onComplete();
                     }
                 });
@@ -1110,7 +1139,6 @@ window.__onPortfolio = function (fn) {
                     if (progress < 1) {
                         requestAnimationFrame(step);
                     } else {
-                        animating = false;
                         if (onComplete) onComplete();
                     }
                 }
@@ -1122,8 +1150,10 @@ window.__onPortfolio = function (fn) {
             if (animating) return;
             const cur = getTheme();
             targetTheme = cur === 'dark' ? 'light' : 'dark';
-            createSplitLayer(targetTheme);
-            const stageW = stageRect ? stageRect.width : (stageEl.clientWidth || (window.innerWidth - 16));
+            if (!splitLayer) {
+                createSplitLayer(targetTheme);
+            }
+            const stageW = stageRect ? stageRect.width : (stageEl.clientWidth || window.innerWidth);
             const handleW = themeHandle.offsetWidth || 24;
             const maxTravel = Math.max(1, stageW - handleW);
             animateSplit(0, maxTravel, 420, 'power2.inOut', () => finishTransition(targetTheme));
@@ -1250,6 +1280,7 @@ window.__onPortfolio = function (fn) {
         const isDark = (document.documentElement.dataset.theme || 'light') === 'dark';
         ctxThemeLabel.textContent = isDark ? 'Switch to Light' : 'Switch to Dark';
     }
+    window.addEventListener('themechange', updateThemeLabel);
 
     function updateActiveNav() {
         const activePage = document.querySelector('.page-section.is-active');
@@ -1377,6 +1408,22 @@ window.__onPortfolio = function (fn) {
             if (focusIdx >= 0 && focusIdx < items.length) {
                 items[focusIdx].click();
             }
+        } else if (e.key === '1') {
+            e.preventDefault();
+            const target = ctxMenu.querySelector('.ctx-item[data-page="me"]');
+            if (target) target.click();
+        } else if (e.key === '2') {
+            e.preventDefault();
+            const target = ctxMenu.querySelector('.ctx-item[data-page="projects"]');
+            if (target) target.click();
+        } else if (e.key === '3') {
+            e.preventDefault();
+            const target = ctxMenu.querySelector('.ctx-item[data-page="experience"]');
+            if (target) target.click();
+        } else if (e.key === 't' || e.key === 'T') {
+            e.preventDefault();
+            const target = ctxMenu.querySelector('.ctx-item[data-action="theme"]');
+            if (target) target.click();
         }
     });
 
