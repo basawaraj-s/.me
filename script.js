@@ -552,7 +552,7 @@ window.__onPortfolio = function (fn) {
 })();
 
 /* ============================================================
-   NAV · ROUTING · TRANSITIONS · CURSOR · TOAST
+   NAV · ROUTING · TRANSITIONS · TOAST
    ============================================================ */
 (() => {
     if (window.lucide && typeof window.lucide.createIcons === 'function') {
@@ -564,7 +564,6 @@ window.__onPortfolio = function (fn) {
 
     const pill = document.getElementById('pill');
     const thumb = document.getElementById('pillThumb');
-    const cursor = document.getElementById('cursor');
     const pageEl = document.getElementById('page');
     const items = pill.querySelectorAll('.item');
     const navItems = Array.from(pill.querySelectorAll('.item[data-page]'));
@@ -572,8 +571,6 @@ window.__onPortfolio = function (fn) {
     const toastEl = document.getElementById('toast');
 
     const PAGE_LABELS = { me: 'Me', projects: 'Projects', experience: 'Experience' };
-    let pageLabel = PAGE_LABELS.me;
-    let onPageLabelChange = null;          // set by the cursor block
     const hasGsap = typeof window.gsap !== 'undefined';
     const animate = hasGsap && !REDUCED;
 
@@ -657,9 +654,6 @@ window.__onPortfolio = function (fn) {
             : 'Basawaraj — ' + id.charAt(0).toUpperCase() + id.slice(1);
 
         if (push) { try { history.pushState(null, '', '#' + id); } catch (e) { } }
-
-        pageLabel = PAGE_LABELS[id];
-        if (onPageLabelChange) onPageLabelChange(dir);
 
         // Content: fade current out, then swap and play the entrance
         if (flow) { flow.kill(); flow = null; }
@@ -829,244 +823,6 @@ window.__onPortfolio = function (fn) {
         resumeBtn.classList.add('nudge');
         resumeBtn.addEventListener('animationend', () => resumeBtn.classList.remove('nudge'), { once: true });
     });
-
-    /* ---------- Custom cursor ---------- */
-    if (matchMedia('(hover: hover) and (pointer: fine)').matches && !REDUCED && cursor) {
-        document.documentElement.classList.add('has-cursor');
-
-        const dot = cursor.querySelector('.dot');
-        const label = cursor.querySelector('.label');
-
-        let tx = 0, ty = 0, x = 0, y = 0, init = false;
-        let cursorRaf = null;
-        let lastCursorTime = 0;
-
-        // Velocity tracking for deformation direction
-        let vx = 0, vy = 0;
-        // Smoothed deformation values (for gradual return to circle)
-        let curStretch = 1, curSquash = 1, curAngle = 0;
-
-        const EASE_SPEED = 12;       // position smoothing (units/sec, exponential)
-        const DEFORM_DECAY = 14;     // how fast deformation returns to rest
-        const STOP_THRESHOLD = 0.15; // px — stop loop when close enough
-
-        function startCursorLoop() {
-            if (!cursorRaf) {
-                lastCursorTime = performance.now();
-                cursorRaf = requestAnimationFrame(loopCursor);
-            }
-        }
-
-        function loopCursor(now) {
-            const dt = Math.min(0.064, Math.max(0.001, (now - lastCursorTime) / 1000));
-            lastCursorTime = now;
-
-            const dx = tx - x, dy = ty - y;
-            const posDist = Math.abs(dx) + Math.abs(dy);
-
-            // Frame-rate independent exponential smoothing
-            const posK = 1 - Math.exp(-dt * EASE_SPEED);
-            const stepX = dx * posK;
-            const stepY = dy * posK;
-            x += stepX;
-            y += stepY;
-
-            cursor.style.transform = 'translate3d(' + x.toFixed(1) + 'px,' + y.toFixed(1) + 'px,0)';
-
-            // Velocity = actual movement this frame (px/sec)
-            vx = stepX / dt;
-            vy = stepY / dt;
-            const vel = Math.hypot(vx, vy);
-
-            // Target deformation based on velocity magnitude
-            const deformK = 1 - Math.exp(-dt * DEFORM_DECAY);
-            if (vel > 8) {
-                const speed = Math.min(vel, 2400) / 2400;
-                const targetStretch = 1 + speed * 0.35;
-                const targetSquash = Math.max(0.72, 1 - speed * 0.18);
-                const targetAngle = Math.atan2(vy, vx) * (180 / Math.PI);
-
-                curStretch += (targetStretch - curStretch) * deformK;
-                curSquash += (targetSquash - curSquash) * deformK;
-
-                // Shortest-path angle interpolation
-                let angleDiff = targetAngle - curAngle;
-                if (angleDiff > 180) angleDiff -= 360;
-                if (angleDiff < -180) angleDiff += 360;
-                curAngle += angleDiff * deformK;
-
-                dot.style.transform = 'rotate(' + curAngle.toFixed(1) + 'deg) scale(' + curStretch.toFixed(3) + ',' + curSquash.toFixed(3) + ') rotate(' + (-curAngle).toFixed(1) + 'deg)';
-            } else {
-                // Smoothly ease back to circle
-                curStretch += (1 - curStretch) * deformK;
-                curSquash += (1 - curSquash) * deformK;
-
-                const deformDist = Math.abs(curStretch - 1) + Math.abs(curSquash - 1);
-                if (deformDist > 0.002) {
-                    dot.style.transform = 'rotate(' + curAngle.toFixed(1) + 'deg) scale(' + curStretch.toFixed(3) + ',' + curSquash.toFixed(3) + ') rotate(' + (-curAngle).toFixed(1) + 'deg)';
-                } else {
-                    curStretch = 1;
-                    curSquash = 1;
-                    dot.style.transform = '';
-                }
-            }
-
-            // Continue loop if position or deformation hasn't settled
-            const deformDist = Math.abs(curStretch - 1) + Math.abs(curSquash - 1);
-            if (posDist > STOP_THRESHOLD || deformDist > 0.003) {
-                cursorRaf = requestAnimationFrame(loopCursor);
-            } else {
-                x = tx;
-                y = ty;
-                cursor.style.transform = 'translate3d(' + x + 'px,' + y + 'px,0)';
-                dot.style.transform = '';
-                curStretch = 1;
-                curSquash = 1;
-                cursorRaf = null;
-            }
-        }
-
-        document.addEventListener('pointermove', (e) => {
-            if (e.pointerType === 'touch') return;
-            tx = e.clientX; ty = e.clientY;
-            if (!init) {
-                x = tx; y = ty; init = true;
-                cursor.style.transform = 'translate3d(' + x + 'px, ' + y + 'px, 0)';
-                cursor.style.opacity = 1;
-                showPageLabel(1);
-            }
-
-            const marginX = Math.min(120, window.innerWidth * 0.15);
-            const marginY = Math.min(120, window.innerHeight * 0.15);
-            cursor.classList.toggle('flip-x', tx > window.innerWidth - marginX);
-            cursor.classList.toggle('flip-y', ty > window.innerHeight - marginY);
-            startCursorLoop();
-        }, { passive: true });
-
-        document.documentElement.addEventListener('mouseleave', () => {
-            cursor.style.opacity = 0;
-            cursor.classList.remove('active', 'on-item');
-            hovering = false;
-        });
-        document.documentElement.addEventListener('mouseenter', () => {
-            if (init) {
-                cursor.style.opacity = 1;
-                startCursorLoop();
-            }
-        });
-
-        document.addEventListener('pointerdown', (e) => {
-            if (e.pointerType !== 'touch') cursor.classList.add('down');
-        });
-        document.addEventListener('pointerup', () => cursor.classList.remove('down'));
-        document.addEventListener('pointercancel', () => cursor.classList.remove('down'));
-        window.addEventListener('blur', () => cursor.classList.remove('down'));
-
-        const STAGGER = 22;
-        const OUT_DUR = 260;
-
-        function buildCharSpan(text, dir) {
-            const el = document.createElement('span');
-            el.className = 'label__text';
-            const chars = [...text];
-            const n = chars.length;
-            chars.forEach((ch, i) => {
-                const s = document.createElement('span');
-                s.textContent = ch === ' ' ? '\u00A0' : ch;
-                const idx = dir >= 0 ? i : n - 1 - i;
-                s.style.setProperty('--d', (idx * STAGGER) + 'ms');
-                el.appendChild(s);
-            });
-            return el;
-        }
-
-        function swapLabel(text, dir) {
-            if (!text) return;
-            label.querySelectorAll('.label__text[data-leaving]').forEach(el => el.remove());
-
-            const current = label.querySelector('.label__text:not([data-leaving])');
-            if (current && current.textContent.replace(/\u00A0/g, ' ') === text) return;
-
-            const probe = buildCharSpan(text, 0);
-            probe.style.cssText = 'position:absolute;visibility:hidden;left:0;top:0;';
-            label.appendChild(probe);
-            const targetWidth = probe.offsetWidth;
-            probe.remove();
-
-            const currentWidth = parseFloat(getComputedStyle(label).width) || 0;
-            label.style.width = currentWidth + 'px';
-            void label.offsetWidth;
-            label.style.width = targetWidth + 'px';
-
-            const next = buildCharSpan(text, dir);
-            label.appendChild(next);
-
-            if (current) {
-                const kids = current.querySelectorAll(':scope > span');
-                const n = kids.length;
-                kids.forEach((s, i) => {
-                    const idx = dir >= 0 ? i : n - 1 - i;
-                    s.style.setProperty('--d', (idx * STAGGER) + 'ms');
-                });
-                void current.offsetWidth;
-                current.dataset.leaving = '';
-                const lastDelay = (n - 1) * STAGGER;
-                setTimeout(() => current.remove(), OUT_DUR + lastDelay + 60);
-            }
-        }
-
-        let hovering = false;
-        let prevLeft = null;
-        const HOVER_SEL = '.item, .footer-link, .theme-handle';
-
-        const labelFor = (t) => {
-            if (t.classList.contains('footer-link')) return t.textContent.trim().replace(/\s*↗\s*$/, '');
-            if (t.id === 'themeHandle') {
-                const isDark = (document.documentElement.dataset.theme || 'light') === 'dark';
-                return isDark ? 'Slide for White' : 'Slide for Black';
-            }
-            return t.dataset.cursor;
-        };
-
-        function showPageLabel(dir) {
-            swapLabel(pageLabel, dir || 1);
-            cursor.classList.add('active');
-            cursor.classList.remove('on-item');
-        }
-        onPageLabelChange = (dir) => { if (init && !hovering) showPageLabel(dir); };
-
-        document.addEventListener('pointerover', (e) => {
-            const t = e.target.closest(HOVER_SEL);
-            if (!t || t.contains(e.relatedTarget)) return;
-            const text = labelFor(t);
-            if (!text) return;
-            hovering = true;
-            const left = t.getBoundingClientRect().left;
-            const dir = prevLeft === null ? 1 : (Math.sign(left - prevLeft) || 1);
-            swapLabel(text, dir);
-            cursor.classList.add('active', 'on-item');
-            prevLeft = left;
-        });
-
-        document.addEventListener('pointerout', (e) => {
-            const t = e.target.closest(HOVER_SEL);
-            if (!t || t.contains(e.relatedTarget)) return;
-            // moving straight onto another item: let pointerover handle it, no flicker
-            if (e.relatedTarget && e.relatedTarget.closest && e.relatedTarget.closest(HOVER_SEL)) return;
-            hovering = false;
-            showPageLabel(1);
-        });
-
-        document.querySelectorAll('.item').forEach(el => {
-            el.addEventListener('focus', () => {
-                if (!el.matches(':focus-visible')) return;
-                hovering = true;
-                swapLabel(el.dataset.cursor, 1);
-                cursor.classList.add('active', 'on-item');
-            });
-            el.addEventListener('blur', () => { hovering = false; showPageLabel(1); });
-        });
-    }
 })();
 
 /* ============================================================
@@ -1168,15 +924,14 @@ window.__onPortfolio = function (fn) {
             if (themeSlider) themeSlider.dataset.side = side;
         }
 
-        function updateCursor() {
+        function updateHandleA11y() {
             const isDark = getTheme() === 'dark';
-            themeHandle.dataset.cursor = isDark ? 'Slide for White' : 'Slide for Black';
             themeHandle.setAttribute('aria-label', isDark ? 'Switch to light theme' : 'Switch to dark theme');
             themeHandle.setAttribute('aria-pressed', isDark ? 'false' : 'true');
         }
 
         updateSide();
-        updateCursor();
+        updateHandleA11y();
 
         function createSplitLayer(target) {
             if (splitLayer) {
@@ -1321,7 +1076,7 @@ window.__onPortfolio = function (fn) {
                 themeSplitLine.style.transform = '';
             }
 
-            updateCursor();
+            updateHandleA11y();
 
             requestAnimationFrame(() => {
                 requestAnimationFrame(() => {
