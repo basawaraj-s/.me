@@ -5,10 +5,18 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="color-scheme" content="light dark">
+    <meta name="description" content="Basawaraj — AI/ML engineer specializing in applied machine learning, neural architectures, data pipelines, and developer tooling.">
+    <meta name="author" content="Basawaraj">
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f2f3f5">
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#09090b">
+    <meta property="og:title" content="Basawaraj — Can machines really think?">
+    <meta property="og:description" content="AI/ML engineer building applied machine learning models, data pipelines, and intelligent systems.">
+    <meta property="og:type" content="website">
     <title>Basawaraj — Can machines really think?</title>
 
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='46' fill='%23121212'/><circle cx='50' cy='50' r='38' fill='%23ffffff'/><circle cx='50' cy='50' r='24' fill='%23ff1205'/></svg>">
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link
         href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300..900&family=JetBrains+Mono:wght@400;500&display=swap"
         rel="stylesheet">
@@ -58,6 +66,12 @@
             .type-cursor {
                 display: none !important;
             }
+
+            .theme-slider {
+                opacity: 1 !important;
+                visibility: visible !important;
+                pointer-events: auto !important;
+            }
         </style>
     </noscript>
 </head>
@@ -73,36 +87,71 @@
         <span class="label"></span>
     </div>
 
+    <!-- THEME SLIDER (drag or click for real-time dual-theme split transition) -->
+    <div class="theme-split-line" id="themeSplitLine" aria-hidden="true"></div>
+    <div class="theme-slider" id="themeSlider" aria-label="Theme mode switcher">
+        <button class="theme-handle" id="themeHandle" type="button" aria-label="Toggle theme mode"
+            aria-pressed="false" data-cursor="Slide for White">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                class="theme-icon theme-icon--sun" aria-hidden="true">
+                <circle cx="12" cy="12" r="4" />
+                <path d="M12 2v2" />
+                <path d="M12 20v2" />
+                <path d="m4.93 4.93 1.41 1.41" />
+                <path d="m17.66 17.66 1.41 1.41" />
+                <path d="M2 12h2" />
+                <path d="M20 12h2" />
+                <path d="m6.34 17.66-1.41 1.41" />
+                <path d="m19.07 4.93-1.41 1.41" />
+            </svg>
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                class="theme-icon theme-icon--moon" aria-hidden="true">
+                <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />
+            </svg>
+        </button>
+    </div>
+
     <div class="stage" id="stage">
 
-        <div class="pill" id="pill">
+        <nav class="pill" id="pill" aria-label="Primary navigation" role="tablist">
             <span class="pill__thumb" id="pillThumb" aria-hidden="true"></span>
 
-            <button class="item is-active" style="--i:0" data-page="me" data-cursor="Me" aria-label="Me"><i
-                    data-lucide="user"></i></button>
-            <button class="item" style="--i:1" data-page="projects" data-cursor="Projects" aria-label="Projects"><i
-                    data-lucide="folder"></i></button>
+            <button class="item is-active" style="--i:0" data-page="me" data-cursor="Me" aria-label="Me section"
+                role="tab" aria-selected="true" id="tab-me" aria-controls="page-me">
+                <i data-lucide="user"></i>
+            </button>
+            <button class="item" style="--i:1" data-page="projects" data-cursor="Projects"
+                aria-label="Projects section" role="tab" aria-selected="false" id="tab-projects"
+                aria-controls="page-projects">
+                <i data-lucide="folder"></i>
+            </button>
             <button class="item" style="--i:2" data-page="experience" data-cursor="Experience"
-                aria-label="Experience"><i data-lucide="briefcase"></i></button>
+                aria-label="Experience section" role="tab" aria-selected="false" id="tab-experience"
+                aria-controls="page-experience">
+                <i data-lucide="briefcase"></i>
+            </button>
 
             <button class="item item--resume" id="resumeBtn" type="button" style="--i:3" data-cursor="Resume · soon"
-                aria-label="Resume (soon)">
+                aria-label="Download resume (coming soon)">
                 <i data-lucide="download"></i>
             </button>
-        </div>
+        </nav>
 
-        <div class="page" id="page">
+        <main class="page" id="page">
             <div class="page__inner">
 
-                <section id="page-me" class="page-section" data-page="me">
+                <section id="page-me" class="page-section" data-page="me" role="tabpanel" aria-labelledby="tab-me">
                     <div class="me-hero">
-                        <div class="quality-band" aria-hidden="true">
-                            <span class="quality-band-name">Basawaraj</span>
-                            <span class="quality-band-quote">Be a yardstick of quality</span>
+                        <div class="quality-band">
+                            <h1 class="quality-band-name">Basawaraj</h1>
+                            <p class="quality-band-quote">Be a yardstick of quality</p>
                         </div>
 
                         <div class="quality-avatar">
-                            <div class="avatar" id="avatar" role="img" aria-label="Portrait of Basawaraj">
+                            <div class="avatar" id="avatar" role="img"
+                                aria-label="Portrait of Basawaraj. Hover or focus to reveal." tabindex="0">
                                 <div class="disc"><canvas id="art"></canvas></div>
                             </div>
                             <p class="note" id="note" hidden></p>
@@ -116,7 +165,8 @@
                     </p>
                 </section>
 
-                <section id="page-projects" class="page-section" data-page="projects">
+                <section id="page-projects" class="page-section" data-page="projects" role="tabpanel"
+                    aria-labelledby="tab-projects">
                     <header class="sheet__head">
                         <h1 data-enter>Selected Works</h1>
                         <p data-enter>Work in applied machine learning: models, data pipelines, and the tooling
@@ -124,11 +174,13 @@
                     </header>
 
                     <div class="exp-section" data-enter>
-                        <p class="coming-soon" id="projectsComingSoon" data-text="Still have to vibe code">Still have to vibe code</p>
+                        <p class="coming-soon" id="projectsComingSoon" data-text="Still have to vibe code">Still have to
+                            vibe code</p>
                     </div>
                 </section>
 
-                <section id="page-experience" class="page-section" data-page="experience">
+                <section id="page-experience" class="page-section" data-page="experience" role="tabpanel"
+                    aria-labelledby="tab-experience">
                     <header class="sheet__head">
                         <h1 data-enter>Experience</h1>
                         <p data-enter>A snapshot of where I’ve worked, what I’ve built, and the tools I reach for
@@ -136,12 +188,13 @@
                     </header>
 
                     <div class="exp-section" data-enter>
-                        <p class="coming-soon" id="experienceComingSoon" data-text="Still have to vibe code">Still have to vibe code</p>
+                        <p class="coming-soon" id="experienceComingSoon" data-text="Still have to vibe code">Still have
+                            to vibe code</p>
                     </div>
                 </section>
 
             </div>
-        </div>
+        </main>
 
         <footer class="site-footer" role="contentinfo">
             <span class="footer-seg footer-seg--left">
@@ -150,16 +203,71 @@
             </span>
 
             <span class="footer-seg footer-seg--right">
-                <a class="footer-link" href="https://www.linkedin.com/" target="_blank" rel="noopener"
+                <a class="footer-link" href="https://www.linkedin.com/" target="_blank" rel="noopener noreferrer"
                     aria-label="LinkedIn (opens in a new tab)">
                     LinkedIn <span class="ext" aria-hidden="true">↗</span>
                 </a>
-                <a class="footer-link" href="https://github.com/" target="_blank" rel="noopener"
+                <a class="footer-link" href="https://github.com/basawaraj-s" target="_blank" rel="noopener noreferrer"
                     aria-label="GitHub (opens in a new tab)">
                     GitHub <span class="ext" aria-hidden="true">↗</span>
                 </a>
             </span>
         </footer>
+    </div>
+
+    <!-- CONTEXT MENU -->
+    <div class="ctx-menu" id="ctxMenu" role="menu" aria-label="Context menu" tabindex="-1">
+        <div class="ctx-menu__inner">
+            <div class="ctx-group">
+                <button class="ctx-item" role="menuitem" data-action="nav" data-page="me" tabindex="-1">
+                    <span class="ctx-icon"><i data-lucide="user"></i></span>
+                    <span class="ctx-label">Me</span>
+                    <span class="ctx-shortcut">1</span>
+                </button>
+                <button class="ctx-item" role="menuitem" data-action="nav" data-page="projects" tabindex="-1">
+                    <span class="ctx-icon"><i data-lucide="folder"></i></span>
+                    <span class="ctx-label">Projects</span>
+                    <span class="ctx-shortcut">2</span>
+                </button>
+                <button class="ctx-item" role="menuitem" data-action="nav" data-page="experience" tabindex="-1">
+                    <span class="ctx-icon"><i data-lucide="briefcase"></i></span>
+                    <span class="ctx-label">Experience</span>
+                    <span class="ctx-shortcut">3</span>
+                </button>
+            </div>
+            <div class="ctx-divider" role="separator"></div>
+            <div class="ctx-group">
+                <button class="ctx-item" role="menuitem" data-action="theme" tabindex="-1">
+                    <span class="ctx-icon ctx-icon--theme">
+                        <i data-lucide="sun" class="ctx-theme-sun"></i>
+                        <i data-lucide="moon" class="ctx-theme-moon"></i>
+                    </span>
+                    <span class="ctx-label" id="ctxThemeLabel">Switch to Dark</span>
+                    <span class="ctx-shortcut">T</span>
+                </button>
+            </div>
+            <div class="ctx-divider" role="separator"></div>
+            <div class="ctx-group">
+                <button class="ctx-item" role="menuitem" data-action="resume" tabindex="-1">
+                    <span class="ctx-icon"><i data-lucide="download"></i></span>
+                    <span class="ctx-label">Resume</span>
+                    <span class="ctx-badge">Soon</span>
+                </button>
+            </div>
+            <div class="ctx-divider" role="separator"></div>
+            <div class="ctx-group">
+                <a class="ctx-item" role="menuitem" data-action="link" href="https://www.linkedin.com/" target="_blank" rel="noopener noreferrer" tabindex="-1">
+                    <span class="ctx-icon"><i data-lucide="linkedin"></i></span>
+                    <span class="ctx-label">LinkedIn</span>
+                    <span class="ctx-ext">↗</span>
+                </a>
+                <a class="ctx-item" role="menuitem" data-action="link" href="https://github.com/basawaraj-s" target="_blank" rel="noopener noreferrer" tabindex="-1">
+                    <span class="ctx-icon"><i data-lucide="github"></i></span>
+                    <span class="ctx-label">GitHub</span>
+                    <span class="ctx-ext">↗</span>
+                </a>
+            </div>
+        </div>
     </div>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
